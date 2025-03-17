@@ -28,6 +28,7 @@ func main() {
 		eController := controller.NewExportCsvController(eService)
 
 		g.POST("/create", eController.CreateExportJobHandler)
+		g.GET("/get-status/:id", eController.GetExportJobStatusHandler)
 	}
 
 	r.Run()
