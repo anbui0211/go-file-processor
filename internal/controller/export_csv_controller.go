@@ -31,3 +31,19 @@ func (ec *ExportCsvController) CreateExportJobHandler(c *gin.Context) {
 	})
 	return
 }
+
+func (ec *ExportCsvController) GetExportJobStatusHandler(c *gin.Context) {
+	ctx := c.Request.Context()
+	jobId := c.Param("id")
+	status, err := ec.exportCsvService.GetExportStatus(ctx, jobId)
+	if err != nil {
+		c.JSON(500, gin.H{
+			"message": "get export status failed",
+		})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"status_job": status,
+	})
+}

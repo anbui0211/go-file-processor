@@ -13,6 +13,7 @@ import (
 type SQSService interface {
 	CreateQueue(ctx context.Context, queueName string) (string, error)
 	SendMessage(ctx context.Context, message SQSMessage, sqsQueueURL string) error
+	GetQueueMessage(ctx context.Context, queueUrl string) ([]SQSMessage, error)
 }
 
 type sqsServiceImpl struct {
@@ -48,6 +49,11 @@ func (s *sqsServiceImpl) CreateQueue(ctx context.Context, queueName string) (str
 }
 
 func (s *sqsServiceImpl) SendMessage(ctx context.Context, message SQSMessage, sqsQueueURL string) error {
+	// Check if queue exists first
+	if !s.queueExists(ctx, sqsQueueURL) {
+		return fmt.Errorf("queue does not exist: %s", sqsQueueURL)
+	}
+
 	messageBytes, err := json.Marshal(message)
 	if err != nil {
 		return fmt.Errorf("failed to marshal message: %w", err)
@@ -59,4 +65,49 @@ func (s *sqsServiceImpl) SendMessage(ctx context.Context, message SQSMessage, sq
 	})
 
 	return err
+}
+
+func (s *sqsServiceImpl) GetQueueMessage(ctx context.Context, queueUrl string) ([]SQSMessage, error) {
+	output, err := s.client.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
+		QueueUrl:            aws.String(queueUrl),
+		MaxNumberOfMessages: *aws.Int32(10),
+		WaitTimeSeconds:     *aws.Int32(10),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to receive messages: %w", err)
+	}
+
+	var messages []SQSMessage
+	for _, msg := range output.Messages {
+		var sqsMsg SQSMessage
+		if err := json.Unmarshal([]byte(*msg.Body), &sqsMsg); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal message: %w", err)
+		}
+		messages = append(messages, sqsMsg)
+	}
+
+	return messages, nil
+}
+
+func (s *sqsServiceImpl) queueExists(ctx context.Context, queueUrl string) bool {
+	// List all queues
+	result, err := s.client.ListQueues(ctx, &sqs.ListQueuesInput{})
+	if err != nil {
+		return false
+	}
+
+	// Check if the queue URL exists in the list
+	for _, url := range result.QueueUrls {
+		if url == queueUrl {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *sqsServiceImpl) queueExistsV2(ctx context.Context, queueName string) bool {
+	_, err := s.client.GetQueueUrl(ctx, &sqs.GetQueueUrlInput{
+		QueueName: aws.String(queueName),
+	})
+	return err == nil
 }
