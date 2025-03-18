@@ -14,6 +14,7 @@ type SQSService interface {
 	CreateQueue(ctx context.Context, queueName string) (string, error)
 	SendMessage(ctx context.Context, message SQSMessage, sqsQueueURL string) error
 	GetQueueMessage(ctx context.Context, queueUrl string) ([]SQSMessage, error)
+	DeleteMessage(ctx context.Context, message SQSMessage, sqsQueueURL string) error
 }
 
 type sqsServiceImpl struct {
@@ -21,9 +22,10 @@ type sqsServiceImpl struct {
 }
 
 type SQSMessage struct {
-	JobID    string            `json:"job_id"`
-	Type     string            `json:"type"`
-	Metadata map[string]string `json:"metadata,omitempty"`
+	JobID         string            `json:"job_id"`
+	ExportType    string            `json:"export_type"`
+	ReceiptHandle string            `json:"receipt_handle"`
+	Metadata      map[string]string `json:"metadata,omitempty"`
 }
 
 func NewSQSService(cfg aws.Config) SQSService {
@@ -67,6 +69,19 @@ func (s *sqsServiceImpl) SendMessage(ctx context.Context, message SQSMessage, sq
 	return err
 }
 
+func (s *sqsServiceImpl) DeleteMessage(ctx context.Context, message SQSMessage, sqsQueueURL string) error {
+	if message.ReceiptHandle == "" {
+		return fmt.Errorf("receipt handle is required to delete message")
+	}
+
+	_, err := s.client.DeleteMessage(ctx, &sqs.DeleteMessageInput{
+		QueueUrl:      aws.String(sqsQueueURL),
+		ReceiptHandle: aws.String(message.ReceiptHandle),
+	})
+
+	return err
+}
+
 func (s *sqsServiceImpl) GetQueueMessage(ctx context.Context, queueUrl string) ([]SQSMessage, error) {
 	output, err := s.client.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
 		QueueUrl:            aws.String(queueUrl),
@@ -83,6 +98,8 @@ func (s *sqsServiceImpl) GetQueueMessage(ctx context.Context, queueUrl string) (
 		if err := json.Unmarshal([]byte(*msg.Body), &sqsMsg); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal message: %w", err)
 		}
+
+		sqsMsg.ReceiptHandle = *msg.ReceiptHandle
 		messages = append(messages, sqsMsg)
 	}
 
