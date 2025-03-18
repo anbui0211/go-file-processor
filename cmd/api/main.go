@@ -35,6 +35,7 @@ func main() {
 
 		g.POST("/create/:type", eController.CreateExportJobHandler)
 		g.GET("/get-status/:id", eController.GetExportJobStatusHandler)
+		g.GET("/download/:id", eController.DownloadExportFileHandler)
 	}
 
 	r.Run()

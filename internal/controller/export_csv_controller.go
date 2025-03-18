@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"gofile/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -56,4 +57,28 @@ func (ec *ExportCsvController) GetExportJobStatusHandler(c *gin.Context) {
 	c.JSON(200, gin.H{
 		"status_job": status,
 	})
+}
+
+func (ec *ExportCsvController) DownloadExportFileHandler(c *gin.Context) {
+    ctx := c.Request.Context()
+    jobId := c.Param("id")
+
+    fileContent, fileName, err := ec.exportCsvService.DownloadExportFile(ctx, jobId)
+    if err != nil {
+        c.JSON(500, gin.H{
+            "message": "failed to download file",
+            "error":   err.Error(),
+        })
+        return
+    }
+
+    // Set headers for file download
+    c.Header("Content-Description", "File Transfer")
+    c.Header("Content-Transfer-Encoding", "binary")
+    c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", fileName))
+    c.Header("Content-Type", "text/csv")
+    c.Header("Content-Length", fmt.Sprintf("%d", len(fileContent)))
+
+    // Send file content
+    c.Data(200, "text/csv", fileContent)
 }
