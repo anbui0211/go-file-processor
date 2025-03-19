@@ -5,8 +5,8 @@ package wire
 
 import (
 	"gofile/internal/controller"
-	"gofile/internal/repository"
 	"gofile/internal/service"
+	"gofile/internal/wire/provider"
 	"gofile/internal/worker"
 	paws "gofile/pkg/aws"
 
@@ -29,7 +29,7 @@ func InitExportCsvRouterHandler() (*ExportHandlers, error) {
 		provideAWSConfig,
 		paws.NewSQSService,
 		paws.NewS3Service,
-		repository.NewAccountRepository,
+		provider.CommonRepositoryProviderSet, // Inject common repositories
 		service.NewExportCsvService,
 		controller.NewExportCsvController,
 		worker.NewExportCsvWorker,
